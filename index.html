@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>光电效应虚拟仿真实验 | AI 智能探究实验室</title>
+<style>
+  :root{
+    --bg:#fdf8e7; --panel:#fffdf5; --panel2:#fff4cf; --line:#4a4234;
+    --txt:#4a3f2a; --sub:#a08d63; --acc:#ff7a59; --acc2:#4caf6e;
+    --warn:#e8a13d; --err:#f25c54; --ai:#9d6cd5;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:#fdf8e7;
+    background-image:radial-gradient(rgba(255,190,120,.18) 2.2px, transparent 2.2px),
+                     radial-gradient(rgba(160,200,255,.14) 2.2px, transparent 2.2px);
+    background-size:56px 56px, 56px 56px;
+    background-position:0 0, 28px 28px;
+    color:var(--txt); font-family:"Comic Sans MS","Yuanti SC","YouYuan","幼圆","Microsoft YaHei",system-ui,sans-serif;
+    min-height:100vh; overflow-x:hidden;
+  }
+  /* ===== 顶栏 ===== */
+  header{
+    display:flex;align-items:center;gap:14px;padding:12px 20px;
+    border-bottom:3px solid var(--line);background:#fff9e3;
+    position:sticky;top:0;z-index:50;box-shadow:0 4px 0 rgba(74,66,52,.12);
+  }
+  header .logo{width:40px;height:40px;border-radius:14px 4px 12px 6px;display:grid;place-items:center;
+    background:#ffd93d;font-weight:700;font-size:19px;color:#4a3f2a;
+    border:2.5px solid var(--line);box-shadow:3px 3px 0 rgba(74,66,52,.25)}
+  header h1{font-size:18px;font-weight:800;letter-spacing:.5px}
+  header h1 small{color:var(--sub);font-weight:400;margin-left:8px;font-size:12px}
+  .top-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .badge{font-size:11px;padding:4px 10px;border-radius:12px 5px 14px 6px;border:2px solid var(--line);color:var(--sub);background:#fff}
+  .badge.ok{color:#2e7d4f;border-color:var(--line);background:#d9f4e3}
+  .badge.warn{color:#b26a1b;border-color:var(--line);background:#ffedc7}
+  @keyframes wiggle{0%,100%{transform:rotate(0deg)}25%{transform:rotate(-1.6deg)}75%{transform:rotate(1.6deg)}}
+  .btn{
+    background:#fff;color:var(--txt);border:2.5px solid var(--line);border-radius:14px 5px 12px 7px;
+    padding:7px 14px;font-size:13px;cursor:pointer;transition:.1s;white-space:nowrap;font-family:inherit;font-weight:700;
+    box-shadow:3px 3px 0 rgba(74,66,52,.2);
+  }
+  .btn:hover{animation:wiggle .3s;transform:translate(-1px,-1px);box-shadow:5px 5px 0 rgba(74,66,52,.25)}
+  .btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 rgba(74,66,52,.25)}
+  .btn.primary{background:#ff7a59;border-color:var(--line);color:#fff}
+  .btn.primary:hover{filter:brightness(1.05)}
+  .btn.ghost{background:#fff9e3}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* ===== 主布局 ===== */
+  .wrap{display:grid;grid-template-columns:1fr 400px;gap:14px;padding:14px 20px;max-width:1500px;margin:0 auto}
+  @media(max-width:1100px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:2.5px solid var(--line);border-radius:22px 8px 18px 10px;overflow:hidden;box-shadow:5px 6px 0 rgba(74,66,52,.15)}
+  .card-h{padding:10px 16px;border-bottom:2.5px dashed var(--line);display:flex;align-items:center;gap:10px;font-size:15px;font-weight:800}
+  .card-h .hint{font-weight:400;font-size:12px;color:var(--sub);margin-left:auto}
+
+  /* ===== 实验台 ===== */
+  .stage{position:relative;background:#fffdf0}
+  canvas#sim{width:100%;display:block}
+  .readout{
+    position:absolute;top:12px;right:14px;display:flex;flex-direction:column;gap:6px;align-items:flex-end;
+    font-family:Consolas,monospace;font-size:12px;
+  }
+  .readout .ro{background:#fff;border:2px solid var(--line);border-radius:14px 5px 12px 6px;padding:5px 12px;color:var(--sub)}
+  .readout .ro b{color:#2e8b57;font-size:14px;margin-left:6px}
+  .readout .ro b.neg{color:var(--warn)}
+  .scan-overlay{
+    position:absolute;inset:0;display:none;place-items:center;background:rgba(255,249,227,.75);
+    font-size:15px;color:#2e7d4f;letter-spacing:2px;flex-direction:column;gap:10px;font-weight:700;
+  }
+  .scan-overlay.on{display:grid}
+  .spinner{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--acc2);border-radius:50%;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  /* ===== 控制面板 ===== */
+  .controls{padding:16px;display:grid;gap:14px}
+  .ctl-row{display:grid;gap:6px}
+  .ctl-row label{display:flex;justify-content:space-between;font-size:13px;color:var(--sub)}
+  .ctl-row label b{color:var(--txt);font-family:Consolas,monospace}
+  input[type=range]{-webkit-appearance:none;appearance:none;height:6px;border-radius:4px;background:var(--panel2);outline:none;border:1px solid var(--line)}
+  .wl-track input[type=range]{background:transparent;border:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--acc);cursor:pointer;border:2px solid #fff2;box-shadow:0 0 8px rgba(79,140,255,.6)}
+  .wl-track{height:6px;border-radius:4px;background:linear-gradient(90deg,#8b00ff,#4b6cff,#00e5ff,#00e676,#ffe14d,#ff9100,#ff1744)}
+  select{
+    background:#fff;color:var(--txt);border:2.5px solid var(--line);border-radius:10px 14px 6px 12px;padding:8px 10px;font-size:13px;outline:none;width:100%;font-family:inherit;font-weight:700;
+  }
+  .btn-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .mode-tip{font-size:12px;color:#6b5a2a;background:#fffbe0;border:2.5px dashed var(--warn);border-radius:16px 6px 14px 8px;padding:8px 10px;line-height:1.6;font-weight:700}
+  .card-h .hint{font-weight:400;font-size:12px;color:var(--sub);margin-left:auto}
+
+  /* ===== 右侧栏 ===== */
+  .side{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .tabs{display:flex;border-bottom:1px solid var(--line)}
+  .tabs button{
+    flex:1;background:none;border:none;color:var(--sub);padding:11px 4px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;transition:.15s;
+  }
+  .tabs button.on{color:var(--acc);border-bottom-color:var(--acc);font-weight:600}
+  .tab-body{display:none;padding:12px;min-height:430px;max-height:560px;overflow-y:auto}
+  .tab-body.on{display:block}
+
+  /* AI 助教 */
+  .ai-roles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+  .ai-roles button{
+    background:#fff;border:2.5px solid var(--line);color:var(--sub);border-radius:12px 5px 14px 6px;
+    padding:8px 6px;font-size:12px;cursor:pointer;transition:.1s;line-height:1.4;font-family:inherit;box-shadow:2px 2px 0 rgba(74,66,52,.18);
+  }
+  .ai-roles button b{display:block;font-size:13px;color:var(--txt)}
+  .ai-roles button.on{border-color:var(--ai);color:var(--ai);background:#f3eaff}
+  .ai-roles button.on b{color:var(--ai)}
+  #chat{display:flex;flex-direction:column;gap:10px;margin-bottom:10px;min-height:240px}
+  .msg{max-width:92%;padding:9px 12px;border-radius:16px 6px 14px 8px;font-size:13px;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+  .msg.ai{background:#fff;border:2.5px solid var(--line);border-top-left-radius:4px;align-self:flex-start;color:#5a4a2a;box-shadow:3px 3px 0 rgba(74,66,52,.12)}
+  .msg.user{background:#fff3b0;border:2.5px solid var(--line);border-top-right-radius:4px;align-self:flex-end;color:#6b5a2a}
+  .msg.sys{align-self:center;background:none;border:none;color:var(--sub);font-size:11px}
+  .msg .tag{font-size:10px;opacity:.65;display:block;margin-bottom:3px}
+  .ai-input{display:flex;gap:6px}
+  .ai-input textarea{
+    flex:1;background:#fff;border:2.5px solid var(--line);border-radius:14px 6px 12px 8px;color:var(--txt);
+    padding:9px 10px;font-size:13px;resize:none;height:44px;outline:none;font-family:inherit;font-weight:700;
+  }
+  .ai-input textarea:focus{border-color:var(--acc)}
+  .icon-btn{width:44px;border-radius:12px 5px 12px 6px;display:grid;place-items:center;font-size:17px}
+  .icon-btn.rec{border-color:var(--err);color:var(--err);animation:pulse 1.2s infinite}
+  @keyframes pulse{50%{box-shadow:0 0 0 5px rgba(255,107,107,.15)}}
+  .ai-status{font-size:11px;color:var(--sub);margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--sub)}
+  .dot.g{background:var(--acc2);box-shadow:0 0 6px var(--acc2)}
+  .dot.y{background:var(--warn)}
+  .dot.r{background:var(--err)}
+
+  /* 数据表 */
+  table{width:100%;border-collapse:collapse;font-size:12.5px;font-family:Consolas,monospace}
+  th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:center}
+  th{color:var(--sub);font-weight:600;font-size:11.5px}
+  td button{background:none;border:none;color:var(--err);cursor:pointer;font-size:12px}
+  .fit-box{margin-top:12px;padding:12px;border:2.5px solid var(--line);border-radius:14px 6px 16px 8px;background:#fffbe0;font-size:13px;line-height:2;font-weight:700}
+  .fit-box b{color:#2e8b57}
+  canvas#chart{width:100%;border:2.5px solid var(--line);border-radius:16px 8px 14px 10px;margin-top:12px;background:#fffdf0}
+
+  /* 报告 */
+  .report-actions{display:flex;gap:8px;margin-bottom:10px}
+  #report{font-size:13px;line-height:1.8;white-space:pre-wrap;font-family:Consolas,"Microsoft YaHei",monospace;color:#5a4a2a;background:#fffbe0;border:2.5px solid var(--line);border-radius:16px 8px 14px 10px;padding:14px;min-height:340px}
+
+  /* toast 与提示气泡 */
+  #toasts{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:99;align-items:center}
+  .toast{background:#fff;border:2.5px solid var(--line);border-radius:16px 6px 14px 8px;padding:10px 18px;font-size:13px;animation:tin .25s;box-shadow:4px 4px 0 rgba(74,66,52,.2);font-weight:700}
+  .toast.warn{border-color:var(--warn);color:#b26a1b;background:#fff4d6}
+  .toast.ok{border-color:var(--acc2);color:#2e7d4f;background:#e6f7ec}
+  @keyframes tin{from{opacity:0;transform:translateY(12px)}}
+  .ai-hint{
+    position:absolute;left:50%;transform:translateX(-50%);bottom:14px;max-width:80%;
+    background:#fff;border:2.5px solid var(--ai);border-radius:18px 6px 16px 8px;padding:10px 16px;
+    font-size:13px;color:#5a3d7a;display:none;line-height:1.6;box-shadow:4px 4px 0 rgba(157,108,213,.3);font-weight:700;
+  }
+  .ai-hint.on{display:block}
+  .ai-hint b{color:var(--ai)}
+
+  /* 模态框 */
+  .modal{position:fixed;inset:0;background:rgba(74,66,52,.35);display:none;place-items:center;z-index:100;backdrop-filter:blur(3px)}
+  .modal.on{display:grid}
+  .modal-box{background:#fffdf5;border:3px solid var(--line);border-radius:22px 10px 18px 12px;width:min(560px,92vw);max-height:85vh;overflow-y:auto;padding:22px;box-shadow:8px 8px 0 rgba(74,66,52,.25)}
+  .modal-box h3{margin-bottom:14px;font-size:16px;font-weight:800}
+  .modal-box p{font-size:13px;line-height:1.9;color:var(--sub)}
+  .modal-box p b{color:var(--txt)}
+  .field{margin:12px 0}
+  .field label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;font-weight:700}
+  .field input{width:100%;background:#fff;border:2.5px solid var(--line);border-radius:12px 6px 10px 8px;color:var(--txt);padding:8px 10px;font-size:13px;outline:none;font-family:inherit}
+  .radio-row{display:flex;flex-wrap:wrap;gap:6px}
+  .radio-row button{flex:1;min-width:100px}
+  .radio-row button.on{border-color:var(--acc);color:#c2452b;background:#ffe9e2}
+  .modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+  kbd{background:#fff4cf;border:2px solid var(--line);border-radius:6px 3px 5px 4px;padding:1px 6px;font-size:11px}
+  footer{text-align:center;color:#b3a67f;font-size:11px;padding:16px 0 24px;font-weight:700}
+  /* 打印/PDF 导出：只保留报告正文 */
+  @media print{
+    body *{visibility:hidden}
+    #report,#report *{visibility:visible}
+    #report{position:absolute;left:0;top:0;width:100%;border:none;background:#fff;color:#000;box-shadow:none}
+    @page{margin:18mm}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🖍️</div>
+  <h1>光电效应虚拟仿真实验<small>Light Photoelectric Effect · AI 智能探究实验室</small></h1>
+  <div class="top-right">
+    <span class="badge" id="aiModeBadge">AI 检测中…</span>
+    <button class="btn ghost" id="btnVR">🥽 VR 观察</button>
+    <button class="btn ghost" id="btnTheory">📖 实验原理</button>
+    <button class="btn ghost" id="btnSettings">⚙️ 设置</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- ============ 左侧：实验台 ============ -->
+  <div>
+    <div class="card">
+      <div class="card-h">🔬 虚拟实验台 <span class="hint">拖动滑块改变实验条件 · 观察微安表与电子运动</span></div>
+      <div class="stage">
+        <canvas id="sim" width="960" height="540"></canvas>
+        <div class="readout">
+          <div class="ro">光电流 I <b id="roI">0.00 μA</b></div>
+          <div class="ro">电压 U <b id="roV">0.00 V</b></div>
+          <div class="ro">光子能量 E <b id="roE">— eV</b></div>
+          <div class="ro">遏止电压 U<sub>c</sub>(理论) <b id="roUc">— V</b></div>
+        </div>
+        <div class="scan-overlay" id="scanOverlay">
+          <div class="spinner"></div>
+          <div>自动测量中：正在扫描遏止电压…</div>
+        </div>
+        <div class="ai-hint" id="aiHint"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="card-h">🎛️ 实验控制</div>
+      <div class="controls">
+        <div class="ctl-row">
+          <label>入射光波长 λ <b id="vWl">550 nm</b></label>
+          <div class="wl-track"><input type="range" id="wl" min="380" max="700" value="550" step="1" style="width:100%"></div>
+        </div>
+        <div class="ctl-row">
+          <label>光强（饱和电流） <b id="vInten">50 %</b></label>
+          <input type="range" id="inten" min="0" max="100" value="50" style="width:100%">
+        </div>
+        <div class="ctl-row">
+          <label>加速/减速电压 U <b id="vVolt">0.00 V</b></label>
+          <input type="range" id="volt" min="-6" max="6" value="0" step="0.05" style="width:100%">
+        </div>
+        <div class="ctl-row">
+          <label>阴极金属材料（逸出功 W₀）</label>
+          <select id="metal">
+            <option value="1.95">铯 Cs — W₀ = 1.95 eV</option>
+            <option value="2.30">钾 K — W₀ = 2.30 eV</option>
+            <option value="2.36" selected>钠 Na — W₀ = 2.36 eV</option>
+            <option value="2.87">钙 Ca — W₀ = 2.87 eV</option>
+            <option value="4.33">锌 Zn — W₀ = 4.33 eV</option>
+          </select>
+        </div>
+        <div class="btn-grid">
+          <button class="btn primary" id="btnScan">⚡ 自动测 U꜀</button>
+          <button class="btn" id="btnZero">调零</button>
+          <button class="btn" id="btnReset">重置实验</button>
+        </div>
+        <div class="mode-tip" id="modeTip">
+          💡 <b>实验任务</b>：选择不同波长测量遏止电压 U꜀，记录 (ν, U꜀) 数据 ≥ 5 组，在「数据记录」页拟合直线求普朗克常量 h，然后让 AI 数据分析员评估你的结果。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 右侧：AI / 数据 / 报告 ============ -->
+  <div class="side">
+    <div class="card">
+      <div class="tabs">
+        <button class="on" data-tab="ai">🤖 AI 实验助教</button>
+        <button data-tab="data">📊 数据记录</button>
+        <button data-tab="report">📝 实验报告</button>
+      </div>
+
+      <!-- AI -->
+      <div class="tab-body on" id="tab-ai">
+        <div class="ai-roles" id="aiRoles">
+          <button data-role="guide" class="on"><b>🧭 探究引导者</b>苏格拉底式提问，不直接给答案</button>
+          <button data-role="coach"><b>🛠️ 操作纠错员</b>实时诊断操作问题</button>
+          <button data-role="analyst"><b>📈 数据分析员</b>拟合评估与误差分析</button>
+          <button data-role="examiner"><b>🎓 答辩教练</b>针对你的操作提出考题</button>
+        </div>
+        <div id="chat"></div>
+        <div class="ai-input">
+          <button class="btn icon-btn" id="btnMic" title="语音输入">🎤</button>
+          <textarea id="aiText" placeholder="向 AI 助教提问…（Enter 发送）"></textarea>
+          <button class="btn icon-btn primary" id="btnSend">➤</button>
+        </div>
+        <div class="ai-status">
+          <span class="dot" id="aiDot"></span><span id="aiStatusText">正在检测 AI 引擎…</span>
+          <label style="margin-left:auto;display:flex;gap:4px;align-items:center;cursor:pointer">
+            <input type="checkbox" id="voiceOut"> 🔊 语音播报
+          </label>
+        </div>
+      </div>
+
+      <!-- 数据 -->
+      <div class="tab-body" id="tab-data">
+        <table>
+          <thead><tr><th>#</th><th>λ (nm)</th><th>ν (10¹⁴Hz)</th><th>U꜀ (V)</th><th></th></tr></thead>
+          <tbody id="dataBody"><tr><td colspan="5" style="color:var(--sub)">暂无数据 · 请在实验台点击「自动测 U꜀」</td></tr></tbody>
+        </table>
+        <div class="fit-box" id="fitBox">尚未拟合：请先采集 ≥ 2 组不同波长的数据。</div>
+        <canvas id="chart" width="420" height="230"></canvas>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn" id="btnFit" style="flex:1">📐 拟合求 h</button>
+          <button class="btn" id="btnAskFit" style="flex:1">🤖 请 AI 分析数据</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn" id="btnCsv" style="flex:1">📄 导出 CSV</button>
+          <button class="btn" id="btnChartPng" style="flex:1">🖼️ 图线存图</button>
+          <button class="btn" id="btnImport" style="flex:1">📥 导入真实数据</button>
+          <button class="btn" id="btnClearReal" style="flex:1" disabled>🧹 清除对照</button>
+        </div>
+        <input type="file" id="fileReal" accept=".csv,.txt" style="display:none">
+        <div class="fit-box" id="realBox" style="display:none"></div>
+      </div>
+
+      <!-- 报告 -->
+      <div class="tab-body" id="tab-report">
+        <div class="report-actions">
+          <button class="btn primary" id="btnGenReport" style="flex:1">📄 生成实验报告</button>
+          <button class="btn" id="btnAiReview" style="flex:1">🤖 AI 评估报告</button>
+          <button class="btn" id="btnPrint" style="flex:1">🖨️ 打印/PDF</button>
+        </div>
+        <div id="report">点击「生成实验报告」…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>光电效应虚拟仿真实验 · 轻量化单文件 H5 · 物理引擎 / AI 助教 / 数据拟合 均在浏览器本地运行</footer>
+
+<!-- 新手引导 -->
+<div class="modal" id="mGuide">
+  <div class="modal-box">
+    <h3>🚀 三步完成实验</h3>
+    <p><b>第 1 步 · 观察红限</b>：拖动「波长」滑块到 700nm——光再强也没有电流！继续减小波长，找到恰好出现电流的位置，体会「截止频率」。</p>
+    <p><b>第 2 步 · 测遏止电压</b>：选好波长后点击「⚡ 自动测 U꜀」，系统自动扫描电压找到遏止点。换 4~5 个不同波长各测一次。</p>
+    <p><b>第 3 步 · 求普朗克常量</b>：到「📊 数据记录」页点「📐 拟合求 h」，对比公认值看误差。全程可和右侧 AI 助教对话，它能看到你的实时实验状态。</p>
+    <p style="text-align:center;margin-top:6px"><button class="btn primary" id="btnGuideGo" style="min-width:180px">🚀 开始实验</button></p>
+  </div>
+</div>
+
+<!-- 设置 -->
+<div class="modal" id="mSettings">
+  <div class="modal-box">
+    <h3>⚙️ 设置</h3>
+    <div style="display:flex;gap:8px">
+      <div class="field" style="flex:1;margin-top:0"><label>姓名（报告署名）</label><input id="stName" placeholder="张三"></div>
+      <div class="field" style="flex:1;margin-top:0"><label>学号</label><input id="stSid" placeholder="2025xxxx"></div>
+      <div class="field" style="flex:1;margin-top:0"><label>班级</label><input id="stClass" placeholder="物理XX班"></div>
+    </div>
+    <div class="field">
+      <label>AI 模式</label>
+      <div class="radio-row" id="modeRow">
+        <button data-mode="auto" class="on">自动检测</button>
+        <button data-mode="local">本地 Ollama</button>
+        <button data-mode="api">在线 API</button>
+        <button data-mode="offline">纯离线（内置智能）</button>
+      </div>
+    </div>
+    <div class="field"><label>Ollama 地址</label><input id="cfgOllama" value="http://localhost:11434"></div>
+    <div class="field"><label>Ollama 模型（推荐小模型保持轻量）</label><input id="cfgOModel" value="qwen2.5:0.5b"></div>
+    <div class="field"><label>在线 API 地址（OpenAI 兼容）</label><input id="cfgApiUrl" value="https://api.openai.com/v1/chat/completions"></div>
+    <div class="field"><label>API Key（仅保存在本地浏览器）</label><input id="cfgApiKey" type="password" placeholder="sk-..."></div>
+    <div class="field"><label>在线 API 模型</label><input id="cfgApiModel" value="gpt-4o-mini"></div>
+    <p style="font-size:12px">💡 <b>本地 Ollama 提示</b>：安装并运行 <kbd>ollama serve</kbd> 后，需设置环境变量 <kbd>OLLAMA_ORIGINS=*</kbd> 以允许网页跨域访问（Windows: <kbd>setx OLLAMA_ORIGINS "*"</kbd> 后重启 Ollama）。「自动检测」会先尝试本地模型，失败后依次回退在线 API 与内置离线智能，保证 AI 助教永远可用。</p>
+    <div class="modal-foot">
+      <button class="btn" id="cfgCancel">取消</button>
+      <button class="btn primary" id="cfgSave">保存并检测</button>
+    </div>
+  </div>
+</div>
+
+<!-- 原理 -->
+<div class="modal" id="mTheory">
+  <div class="modal-box">
+    <h3>📖 实验原理</h3>
+    <p><b>光电效应</b>：当频率足够高的光照射金属表面时，电子吸收光子后克服逸出功逸出，形成光电流。</p>
+    <p><b>爱因斯坦光电方程</b>：<br>Max E<sub>k</sub> = hν − W₀<br>其中 h 为普朗克常量，ν 为光频率，W₀ 为金属逸出功。</p>
+    <p><b>遏止电压</b>：当反向电压 U = U꜀ 时，最快的光电子恰好不能到达阳极，光电流为零：<br>eU꜀ = hν − W₀ → <b>U꜀ = (h/e)ν − W₀/e</b></p>
+    <p><b>实验思路</b>：改变入射光频率 ν，测得对应的遏止电压 U꜀，作 U꜀–ν 图，直线的<b>斜率 = h/e</b>，截距 = −W₀/e。由斜率即可求出普朗克常量 h，并与公认值 6.626×10⁻³⁴ J·s 比较。</p>
+    <p><b>三条实验规律</b>：① 存在截止频率（红限）；② 光电子最大初动能只与频率有关；③ 光电流饱和值与光强成正比，瞬时响应。</p>
+    <div class="modal-foot"><button class="btn primary" onclick="document.getElementById('mTheory').classList.remove('on')">我知道了</button></div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+"use strict";
+/* ================================================================
+ * 光电效应虚拟仿真实验 — 轻量化单文件 H5
+ * 模块：PHYS(物理) / RENDER(渲染) / SIM(粒子) / CTRL(控制)
+ *      DATA(数据拟合) / AI(四角色助教·三引擎) / COACH(智能纠错)
+ * ================================================================ */
+
+/* ---------------- 物理常量与全局状态 ---------------- */
+const PHYS = {
+  h: 6.62607015e-34, e: 1.602176634e-19, c: 2.99792458e8,
+  photonEnergyEV: l => 1239.841984 / l,          // E(eV) = 1240/λ(nm)
+};
+const S = {
+  wl: 550, inten: 50, volt: 0, metal: 2.36,
+  I: 0, Isat: 0, Uc: 0, E: 0,
+  scanning: false, data: [], real: [], chat: [], role: "guide",
+  actions: [], hints: { redlimit:false, volt:false, enough:false },
+  voiceOut: false,
+};
+const els = id => document.getElementById(id);
+
+function computePhysics(){
+  S.E   = PHYS.photonEnergyEV(S.wl);
+  S.Uc  = Math.max(0, S.E - S.metal);            // 遏止电压(V) = (hν-W0)/e
+  S.Isat = S.E > S.metal ? S.inten * 0.55 : 0;   // 饱和电流 μA ∝ 光强
+  const x = (S.volt + S.Uc) / 1.4;               // 伏安特性模型
+  S.I = S.Isat <= 0 ? 0 : (S.volt <= -S.Uc ? 0 : S.Isat * (1 - Math.exp(-x)));
+  if (S.I > 0.01) S.I += (Math.random()-0.5) * 0.06 * Math.min(S.I, 3); // 热噪声
+  S.I = Math.max(0, S.I);
+  els("roI").textContent  = S.I.toFixed(2) + " μA";
+  els("roV").textContent  = S.volt.toFixed(2) + " V";
+  els("roV").className    = S.volt < 0 ? "neg" : "";
+  els("roE").textContent  = S.E.toFixed(2) + " eV";
+  els("roUc").textContent = S.E > S.metal ? S.Uc.toFixed(2) + " V" : "无 (E<W₀)";
+}
+function logAction(t){ S.actions.push({t:Date.now(), a:t}); if(S.actions.length>40) S.actions.shift(); }
+
+/* ---------------- 波长 → 颜色 ---------------- */
+function wl2rgb(w){
+  let r=0,g=0,b=0;
+  if(w<440){r=-(w-440)/60;b=1} else if(w<490){g=(w-440)/50;b=1}
+  else if(w<510){g=1;b=-(w-510)/20} else if(w<580){r=(w-510)/70;g=1}
+  else if(w<645){r=1;g=-(w-645)/65} else {r=1}
+  let f = w<420 ? .35+.65*(w-380)/40 : 1;
+  return [r*f*255|0, g*f*255|0, b*f*255|0];
+}
+
+/* ---------------- 渲染引擎 ---------------- */
+const cv = els("sim"), ctx = cv.getContext("2d");
+const GEO = { lampX:130, lampY:250, cathX:430, anodeX:530, tubeTop:190, tubeBot:330, gap:100, wireY:430 };
+let photons = [], electrons = [], sparks = [], photonPhase = 0;
+
+let CUR=[84,154,255];
+const rgba = a => `rgba(${CUR[0]},${CUR[1]},${CUR[2]},${a})`;
+function render(){
+  CUR = wl2rgb(S.wl);
+  const col = `rgb(${CUR[0]},${CUR[1]},${CUR[2]})`;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  drawGrid(); drawPetals(); drawLamp(col); drawBeam(col); drawTube(col); drawCircuit(); drawMeter();
+  drawPhotons(col); drawElectrons();
+}
+/* 樱花飘落（动漫氛围装饰） */
+let petals=[];
+function drawPetals(){
+  if(petals.length<14 && Math.random()<.25)
+    petals.push({x:Math.random()*cv.width, y:-12, r:3.5+Math.random()*3.5,
+      vy:.35+Math.random()*.5, ph:Math.random()*6, o:.3+Math.random()*.35});
+  for(let i=petals.length-1;i>=0;i--){
+    const p=petals[i]; p.y+=p.vy; p.x+=Math.sin(p.ph+=.02)*.7;
+    if(p.y>cv.height+14){petals.splice(i,1);continue}
+    ctx.fillStyle=`rgba(255,166,190,${p.o})`;
+    ctx.beginPath(); ctx.ellipse(p.x,p.y,p.r,p.r*.55,p.ph,0,7); ctx.fill();
+  }
+}
+function drawGrid(){
+  ctx.strokeStyle="rgba(190,150,90,.22)"; ctx.lineWidth=1.5; ctx.setLineDash([7,7]); ctx.beginPath();
+  for(let x=0;x<cv.width;x+=40){ctx.moveTo(x,0);ctx.lineTo(x,cv.height)}
+  for(let y=0;y<cv.height;y+=40){ctx.moveTo(0,y);ctx.lineTo(cv.width,y)}
+  ctx.stroke(); ctx.setLineDash([]);
+}
+function drawLamp(col){
+  const {lampX:lampX,lampY:lampY}=GEO;
+  const glow = S.inten>0 ? ctx.createRadialGradient(lampX,lampY,4,lampX,lampY,70+Math.sin(Date.now()/300)*6) : null;
+  if(glow){glow.addColorStop(0, rgba(.55)); glow.addColorStop(1,"transparent");
+    ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(lampX,lampY,76,0,7); ctx.fill();}
+  ctx.fillStyle="#ffffff"; ctx.strokeStyle="#b9c6e8";
+  ctx.beginPath(); ctx.arc(lampX,lampY,26,0,7); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lampX-12,lampY-14); ctx.lineTo(lampX+12,lampY-14);
+  ctx.lineTo(lampX+8,lampY+16); ctx.lineTo(lampX-8,lampY+16); ctx.closePath();
+  ctx.fillStyle="#eef3fd"; ctx.fill();
+  ctx.strokeStyle=S.inten>0?col:"#c0cade"; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(lampX-8,lampY+10); ctx.lineTo(lampX-3,lampY-6);
+  ctx.lineTo(lampX+3,lampY+6); ctx.lineTo(lampX+8,lampY-8); ctx.stroke();
+  ctx.fillStyle="#7d8ab5"; ctx.font="12px Consolas"; ctx.textAlign="center";
+  ctx.fillText("光源 λ="+S.wl+"nm", lampX, lampY+52);
+}
+function drawBeam(col){
+  if(S.inten<=0) return;
+  const {lampX,lampY,cathX}=GEO;
+  const grad = ctx.createLinearGradient(lampX,0,cathX,0);
+  grad.addColorStop(0,rgba(.8)); grad.addColorStop(1,rgba(.2));
+  ctx.save(); ctx.globalAlpha=.18+.32*(S.inten/100)+Math.sin(Date.now()/200)*.03;
+  ctx.fillStyle=grad;
+  ctx.beginPath();
+  ctx.moveTo(lampX+20,lampY-16); ctx.lineTo(cathX-6,lampY-46);
+  ctx.lineTo(cathX-6,lampY+46); ctx.lineTo(lampX+20,lampY+16); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function drawTube(col){
+  const {cathX,anodeX,tubeTop,tubeBot}=GEO;
+  const cx=(cathX+anodeX)/2, w=anodeX-cathX+90, h=tubeBot-tubeTop+30, cy=(tubeTop+tubeBot)/2;
+  // 玻璃壳
+  ctx.save();
+  const glass=ctx.createRadialGradient(cx,cy,10,cx,cy,w/2);
+  glass.addColorStop(0,"rgba(140,180,255,.14)"); glass.addColorStop(1,"rgba(140,180,255,.04)");
+  ctx.fillStyle=glass; ctx.strokeStyle="rgba(130,160,230,.55)"; ctx.lineWidth=2;
+  roundRect(cx-w/2,cy-h/2,w,h,34); ctx.fill(); ctx.stroke();
+  ctx.restore();
+  // 阴极板（金属）
+  const metalCol={"1.95":"#d8b56a","2.30":"#c9c2b0","2.36":"#bfc9d6","2.87":"#c8b8a6","4.33":"#9fb3c8"}[String(S.metal)]||"#ccc";
+  ctx.fillStyle=metalCol; ctx.strokeStyle="rgba(90,110,160,.45)";
+  roundRect(cathX-9,tubeTop,14,tubeBot-tubeTop,4); ctx.fill(); ctx.stroke();
+  // 阳极
+  ctx.fillStyle="#8fa5cc";
+  roundRect(anodeX-5,tubeTop+40,10,tubeBot-tubeTop-80,4); ctx.fill();
+  // 标签
+  ctx.fillStyle="#7d8ab5"; ctx.font="12px Consolas"; ctx.textAlign="center";
+  ctx.fillText("阴极 "+({1.95:"Cs",2.30:"K",2.36:"Na",2.87:"Ca",4.33:"Zn"}[String(S.metal)]), cathX+10, tubeTop-14);
+  ctx.fillText("阳极", anodeX+12, tubeTop+28);
+  // 光电子逸出提示
+  if(S.E<=S.metal && S.inten>0){
+    ctx.fillStyle="rgba(255,107,107,.9)"; ctx.font="12px Microsoft YaHei";
+    ctx.fillText("E光子(" + S.E.toFixed(2) + "eV) < W₀(" + S.metal.toFixed(2) + "eV) → 无光电效应", cx, tubeTop-40);
+  }
+}
+function drawCircuit(){
+  const {cathX,anodeX,wireY,tubeTop,tubeBot}=GEO;
+  ctx.strokeStyle="#a4b6de"; ctx.lineWidth=2; ctx.beginPath();
+  ctx.moveTo(cathX-2,tubeBot); ctx.lineTo(cathX-2,wireY); ctx.lineTo(360,wireY);
+  ctx.moveTo(anodeX,tubeTop+40); ctx.lineTo(anodeX,wireY-40); ctx.lineTo(700,wireY-40); ctx.lineTo(700,wireY);
+  ctx.moveTo(360,wireY); ctx.lineTo(700,wireY); ctx.stroke();
+  // 电池组
+  const bx=490,by=wireY;
+  for(let i=0;i<4;i++){
+    const x=bx+i*14, big=i%2===0;
+    ctx.strokeStyle="#8fa0c2"; ctx.beginPath();
+    ctx.moveTo(x,by-(big?16:10)); ctx.lineTo(x,by+(big?16:10)); ctx.stroke();
+  }
+  ctx.fillStyle = S.volt>=0 ? "#00b894" : "#f0932b"; ctx.font="12px Consolas"; ctx.textAlign="center";
+  ctx.fillText(S.volt.toFixed(2)+" V", bx+22, by+34);
+  ctx.fillStyle="#7d8ab5"; ctx.fillText("电源", bx+22, by+48);
+}
+function drawMeter(){
+  const mx=790,my=400,rad=52;
+  ctx.fillStyle="#ffffff"; ctx.strokeStyle="#b9c6e8"; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(mx,my,rad,0,7); ctx.fill(); ctx.stroke();
+  // 刻度
+  ctx.strokeStyle="#9aa8ce"; ctx.fillStyle="#9aa8ce"; ctx.font="9px Consolas"; ctx.textAlign="center";
+  for(let i=0;i<=10;i++){
+    const a=Math.PI*1.25 - i/10*Math.PI*1.5;
+    ctx.beginPath();
+    ctx.moveTo(mx+Math.cos(a)*(rad-4),my+Math.sin(a)*(rad-4));
+    ctx.lineTo(mx+Math.cos(a)*(rad-10),my+Math.sin(a)*(rad-10)); ctx.stroke();
+    if(i%5===0) ctx.fillText(i===0?"0":"50", mx+Math.cos(a)*(rad-19), my+Math.sin(a)*(rad-19)+3);
+  }
+  // 指针（阻尼动画）
+  meterDisp += (S.I - meterDisp)*0.12;
+  const frac=Math.min(meterDisp/55,1);
+  const a=Math.PI*1.25 - frac*Math.PI*1.5;
+  ctx.strokeStyle="#ff6b81"; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.moveTo(mx,my); ctx.lineTo(mx+Math.cos(a)*(rad-14),my+Math.sin(a)*(rad-14)); ctx.stroke();
+  ctx.fillStyle="#3a4266"; ctx.beginPath(); ctx.arc(mx,my,4,0,7); ctx.fill();
+  ctx.fillStyle="#7d8ab5"; ctx.font="11px Consolas";
+  ctx.fillText("μA", mx, my+24);
+  ctx.fillStyle=S.I>0.05?"#00b894":"#a0abd0"; ctx.font="bold 13px Consolas";
+  ctx.fillText(S.I.toFixed(2), mx, my-28);
+}
+let meterDisp = 0;
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+function drawPhotons(col){
+  photonPhase += .035 + S.inten/100*.10;
+  const n = 7, {lampX,lampY,cathX}=GEO;
+  if(S.inten>0) for(let i=0;i<n;i++){
+    const t=((photonPhase+i/n)%1), x=lampX+24+t*(cathX-lampX-30), y=lampY-40+((i*53)%80);
+    ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x,y,2.4,0,7); ctx.fill();
+    ctx.globalAlpha=.4; ctx.beginPath(); ctx.arc(x-6,y,1.4,0,7); ctx.fill(); ctx.globalAlpha=1;
+  }
+}
+/* 光电子粒子：v0=√(2C·KE), a=U·C/d，能量守恒与真实物理一致 */
+const C_VISC = 20;
+function drawElectrons(){
+  const {cathX,anodeX,tubeTop,tubeBot}=GEO, cy=(tubeTop+tubeBot)/2;
+  // 生成
+  const KE = Math.max(0, S.E - S.metal);
+  if(KE>0 && S.I>0.05 && electrons.length<110 && Math.random() < S.I/38){
+    const v0 = Math.sqrt(2*C_VISC*KE) * (0.85+Math.random()*0.3);
+    electrons.push({x:cathX+6, y:cy+(Math.random()-.5)*110, vx:v0, vy:(Math.random()-.5)*1.2});
+  }
+  const a = S.volt * C_VISC / GEO.gap;
+  ctx.shadowColor="rgba(0,184,148,.85)"; ctx.shadowBlur=7;
+  for(let i=electrons.length-1;i>=0;i--){
+    const p=electrons[i];
+    const inField = p.x>cathX && p.x<anodeX;
+    p.x += p.vx*(inField? 1:1); p.y += p.vy;
+    if(inField){ p.vx += a; }
+    if(p.x>=anodeX-4){ sparks.push({x:anodeX-4,y:p.y,t:1}); electrons.splice(i,1); continue; }
+    if(p.vx<0 && p.x<=cathX+4){ electrons.splice(i,1); continue; }
+    if(p.x<cathX+4 && p.vx<0){ electrons.splice(i,1); continue; }
+    ctx.fillStyle="#00c9a4"; ctx.beginPath(); ctx.arc(p.x,p.y,2.6,0,7); ctx.fill();
+  }
+  ctx.shadowBlur=0;
+  for(let i=sparks.length-1;i>=0;i--){
+    const s=sparks[i]; s.t-=.08; if(s.t<=0){sparks.splice(i,1);continue}
+    ctx.strokeStyle=`rgba(0,212,160,${s.t})`; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(s.x,s.y,(1-s.t)*9+2,0,7); ctx.stroke();
+  }
+}
+
+/* ---------------- 主循环 ---------------- */
+function loop(){ if(!S.scanning){ computePhysics(); } render(); requestAnimationFrame(loop); }
+
+/* ---------------- 控制交互 ---------------- */
+els("wl").oninput = e=>{ S.wl=+e.target.value; els("vWl").textContent=S.wl+" nm";
+  logAction(`调波长 λ=${S.wl}nm`); coachCheck(); };
+els("inten").oninput = e=>{ S.inten=+e.target.value; els("vInten").textContent=S.inten+" %";
+  logAction(`调光强 ${S.inten}%`); };
+els("volt").oninput = e=>{ S.volt=+e.target.value; els("vVolt").textContent=S.volt.toFixed(2)+" V";
+  logAction(`调电压 ${S.volt.toFixed(2)}V`); };
+els("metal").onchange = e=>{ S.metal=+e.target.value; logAction(`换金属 W₀=${S.metal}eV`); coachCheck(); };
+els("btnZero").onclick = ()=>{ S.volt=0; els("volt").value=0; els("vVolt").textContent="0.00 V"; toast("电压已调零","ok"); };
+els("btnReset").onclick = ()=>{ S.data=[]; S.real=[]; saveData(); renderData(); S.volt=0; els("volt").value=0;
+  els("wl").value=550; S.wl=550; els("vWl").textContent="550 nm";
+  els("inten").value=50; S.inten=50; els("vInten").textContent="50 %";
+  els("fitBox").textContent="尚未拟合：请先采集 ≥ 2 组不同波长的数据。";
+  els("btnClearReal").disabled=true; updateRealBox();
+  drawChart(null); window._lastFit=null;
+  sysMsg("实验已重置，数据已清空。"); };
+els("btnTheory").onclick = ()=> els("mTheory").classList.add("on");
+
+/* ---------------- 自动测量遏止电压 ---------------- */
+els("btnScan").onclick = ()=>{
+  if(S.scanning) return;
+  computePhysics();
+  if(S.E<=S.metal){ toast("当前波长下 E < W₀，无光电效应，请减小波长","warn");
+    sysMsg("检测到无效测量尝试：λ="+S.wl+"nm 时光子能量不足。这正是「红限」现象！"); return; }
+  S.scanning=true; els("scanOverlay").classList.add("on");
+  let V=6.0, found=null, prevI=null;
+  const timer=setInterval(()=>{
+    for(let k=0;k<5;k++){
+      S.volt=V; computePhysics();
+      if(prevI!==null && S.I<0.15 && prevI>=0.15) found=V;
+      prevI=S.I; V-=0.02;
+      if(V<-6.5) break;
+    }
+    els("volt").value=Math.max(S.volt,-6);
+    if(found!==null || V<-6.5){
+      clearInterval(timer);
+      S.volt=0; els("volt").value=0;
+      S.scanning=false; els("scanOverlay").classList.remove("on");
+      if(found!==null){
+        const Uc=Math.abs(found)+ (Math.random()-.5)*.015;
+        S.data.push({wl:S.wl, nu:PHYS.c/(S.wl*1e-9)/1e14, Uc:+Uc.toFixed(3)});
+        saveData(); renderData(); drawChart(autoFit());
+        toast(`✓ 测得 λ=${S.wl}nm 的 U꜀ = ${Uc.toFixed(3)} V`,"ok");
+        logAction(`测得 U꜀=${Uc.toFixed(3)}V @${S.wl}nm`);
+        if(S.data.length>=3 && !S.hints.enough){ S.hints.enough=true;
+          showAiHint("数据已有 "+S.data.length+" 组，可以去「📊 数据记录」页点击 <b>📐 拟合求 h</b>，或让 AI 数据分析员帮你评估误差！");
+          setTimeout(hideAiHint,9000);
+        }
+      } else { toast("扫描未找到遏止点，请检查波长","warn"); }
+      computePhysics();
+    }
+  },16);
+};
+
+/* ---------------- 数据与拟合 ---------------- */
+function saveData(){
+  try{ localStorage.setItem("pe_data",JSON.stringify(S.data));
+       localStorage.setItem("pe_real",JSON.stringify(S.real||[])); }catch(e){}
+}
+function renderData(){
+  const tb=els("dataBody");
+  if(!S.data.length){ tb.innerHTML='<tr><td colspan="5" style="color:var(--sub)">暂无数据 · 请在实验台点击「自动测 U꜀」</td></tr>'; return; }
+  tb.innerHTML=S.data.map((d,i)=>`<tr><td>${i+1}</td><td>${d.wl}</td><td>${d.nu.toFixed(3)}</td><td>${d.Uc.toFixed(3)}</td><td><button onclick="delData(${i})">✕</button></td></tr>`).join("");
+}
+window.delData = i=>{ S.data.splice(i,1); saveData(); renderData(); drawChart(autoFit()); };
+function fitPts(pts){
+  if(!pts||pts.length<2) return null;
+  const n=pts.length;
+  let sx=0,sy=0,sxy=0,sxx=0,syy=0;
+  for(const d of pts){sx+=d.nu;sy+=d.Uc;sxy+=d.nu*d.Uc;sxx+=d.nu*d.nu;syy+=d.Uc*d.Uc}
+  const slope=(n*sxy-sx*sy)/(n*sxx-sx*sx), icept=(sy-slope*sx)/n;
+  const r2n=n*sxy-sx*sy, r2d=Math.sqrt((n*sxx-sx*sx)*(n*syy-sy*sy));
+  return {slope,icept,r2:Math.pow(r2n/r2d,2),n};
+}
+function autoFit(){ return fitPts(S.data); }
+function drawChart(fit){
+  const c=els("chart"), g=c.getContext("2d");
+  g.clearRect(0,0,c.width,c.height);
+  if(!S.data.length && !S.real.length){ g.fillStyle="#a0abd0"; g.font="12px Microsoft YaHei"; g.textAlign="center";
+    g.fillText("U꜀ – ν 图线（采集数据后自动绘制）",c.width/2,c.height/2); return; }
+  const pad=44, W=c.width-pad-14, H=c.height-40;
+  const all=[...S.data,...S.real];
+  const nus=all.map(d=>d.nu), ucs=all.map(d=>d.Uc);
+  const n0=Math.floor(Math.min(...nus)-.1), n1=Math.ceil(Math.max(...nus)+.1);
+  const lo=(n1-n0)<.2 ? n0-.25 : n0, hi=(n1-n0)<.2 ? n1+.25 : n1;
+  const u0=Math.min(0,Math.floor(Math.min(...ucs)-.2)), u1=Math.ceil(Math.max(...ucs)+.2);
+  const X=v=>pad+(v-lo)/(hi-lo)*W, Y=v=>c.height-26-(v-u0)/(u1-u0)*H;
+  g.strokeStyle="#26314e"; g.lineWidth=1;
+  g.beginPath(); g.moveTo(pad,10); g.lineTo(pad,c.height-26); g.lineTo(c.width-10,c.height-26); g.stroke();
+  g.fillStyle="#8fa0c2"; g.font="10px Consolas"; g.textAlign="center";
+  for(let v=n0;v<=n1;v+=.25) g.fillText(v.toFixed(2),X(v),c.height-10);
+  g.textAlign="right";
+  for(let v=u0;v<=u1;v+=.5) g.fillText(v.toFixed(1),pad-4,Y(v)+3);
+  g.textAlign="center"; g.fillText("ν (10¹⁴ Hz)",c.width/2,c.height-1);
+  g.save(); g.translate(11,c.height/2); g.rotate(-Math.PI/2); g.fillText("U꜀ (V)",0,0); g.restore();
+  // 数据点（仿真：蓝色圆点）
+  g.fillStyle="#4f8cff";
+  for(const d of S.data){ g.beginPath(); g.arc(X(d.nu),Y(d.Uc),4,0,7); g.fill(); }
+  // 真实数据点（橙色菱形）
+  if(S.real.length){
+    g.fillStyle="#ff7a59";
+    for(const d of S.real){ g.save(); g.translate(X(d.nu),Y(d.Uc)); g.rotate(Math.PI/4); g.fillRect(-3.5,-3.5,7,7); g.restore(); }
+  }
+  // 图例
+  g.fillStyle="#8fa0c2"; g.font="10px Microsoft YaHei"; g.textAlign="right";
+  g.fillText("● 仿真数据"+(S.real.length?"   ◆ 真实数据":""), c.width-14, 16);
+  // 拟合线
+  if(fit){
+    g.strokeStyle="#00d4a0"; g.lineWidth=1.6; g.setLineDash([5,4]);
+    g.beginPath(); g.moveTo(X(lo),Y(fit.slope*lo+fit.icept)); g.lineTo(X(hi),Y(fit.slope*hi+fit.icept)); g.stroke();
+    g.setLineDash([]);
+  }
+}
+els("btnFit").onclick = ()=>{
+  const fit=autoFit();
+  if(!fit){ toast("数据不足（≥2 组不同波长）","warn"); return; }
+  const h=fit.slope*1e-14*PHYS.e, hErr=(h-PHYS.h)/PHYS.h*100;
+  els("fitBox").innerHTML =
+    `拟合：U꜀ = (${fit.slope.toFixed(4)}×10⁻¹⁵)ν + (${fit.icept.toFixed(3)})   R² = <b>${fit.r2.toFixed(4)}</b><br>`+
+    `斜率 = h/e → <b>h = ${h.toExponential(4)} J·s</b><br>`+
+    `公认值 6.6261×10⁻³⁴ J·s · 相对误差 <b style="color:${Math.abs(hErr)<5?'var(--acc2)':'var(--warn)'}">${hErr.toFixed(2)}%</b><br>`+
+    `截距 = −W₀/e → W₀ ≈ ${(-fit.icept).toFixed(2)} eV（设定值 ${S.metal} eV）`;
+  // AI 离群点检测：残差最大的数据点
+  let worst=null;
+  S.data.forEach((d,i)=>{ const r=d.Uc-(fit.slope*d.nu+fit.icept);
+    if(!worst||Math.abs(r)>Math.abs(worst.r)) worst={no:i+1,r,d}; });
+  if(worst && Math.abs(worst.r)>0.08){
+    els("fitBox").innerHTML += `<br><span style="color:var(--warn)">⚠️ 离群点检测：第 ${worst.no} 组 (λ=${worst.d.wl}nm) 残差 ${worst.r>0?"+":""}${worst.r.toFixed(3)}V 偏大，建议重测或删除后重新拟合。</span>`;
+    toast("⚠️ 检测到疑似离群数据点","warn"); logAction("发现离群点 @"+worst.d.wl+"nm");
+  }
+  drawChart(fit); logAction("完成拟合 h="+h.toExponential(3));
+  window._lastFit={fit,h,hErr};
+  updateRealBox();
+  toast("拟合完成，h 相对误差 "+hErr.toFixed(2)+"%","ok");
+};
+els("btnAskFit").onclick = ()=>{ switchTab("ai"); askAI("请分析我当前采集的 (ν, U꜀) 数据，评估拟合质量、误差来源，并给出改进建议。"); };
+
+/* ---------------- CSV 导出 / 真实数据导入 ---------------- */
+els("btnCsv").onclick = ()=>{
+  if(!S.data.length){ toast("暂无数据，请先采集","warn"); return; }
+  const rows=[["序号","波长 λ (nm)","频率 ν (10^14 Hz)","遏止电压 Uc (V)"],
+    ...S.data.map((d,i)=>[i+1,d.wl,d.nu.toFixed(3),d.Uc.toFixed(3)])];
+  const csv="\uFEFF"+rows.map(r=>r.join(",")).join("\r\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download="光电效应数据.csv"; a.click();
+  toast("CSV 已导出（Excel 可直接打开）","ok"); logAction("导出CSV");
+};
+els("btnChartPng").onclick = ()=>{
+  if(!S.data.length && !S.real.length){ toast("暂无数据，请先采集","warn"); return; }
+  const a=document.createElement("a");
+  a.href=els("chart").toDataURL("image/png");
+  a.download="Uc-nu图线.png"; a.click();
+  toast("图线已保存为 PNG","ok"); logAction("导出图线PNG");
+};
+els("btnImport").onclick = ()=> els("fileReal").click();
+els("fileReal").onchange = e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    const pts=[];
+    rd.result.split(/\r?\n/).forEach(line=>{
+      const m=line.trim().match(/^(\d+(?:\.\d+)?)\s*[,;\t ]\s*(\d+(?:\.\d+)?)/);
+      if(m){ const wl=+m[1], Uc=+m[2];
+        if(wl>=380&&wl<=780&&Uc>=0&&Uc<10) pts.push({wl,nu:PHYS.c/(wl*1e-9)/1e14,Uc}); }
+    });
+    if(pts.length<2){ toast("有效数据不足 2 组。每行格式：波长nm,遏止电压V","warn"); return; }
+    S.real=pts; saveData(); renderData(); drawChart(autoFit());
+    els("btnClearReal").disabled=false; updateRealBox();
+    toast("✓ 已导入 "+pts.length+" 组真实数据，将作为对照点显示","ok");
+    logAction("导入真实数据 "+pts.length+" 组");
+  };
+  rd.readAsText(f); e.target.value="";
+};
+els("btnClearReal").onclick = ()=>{
+  S.real=[]; saveData(); els("btnClearReal").disabled=true;
+  updateRealBox(); drawChart(autoFit()); toast("已清除真实对照数据","ok");
+};
+function updateRealBox(){
+  const rb=els("realBox");
+  if(!S.real.length){ rb.style.display="none"; return; }
+  const rf=fitPts(S.real);
+  let html="<b>📥 真实数据对照</b>（已导入 "+S.real.length+" 组，橙色菱形点）<br>";
+  if(rf){
+    const h=rf.slope*1e-14*PHYS.e, err=(h-PHYS.h)/PHYS.h*100;
+    html+="真实拟合：R²=<b>"+rf.r2.toFixed(4)+"</b>，h=<b>"+h.toExponential(4)+" J·s</b>（与公认值误差 "+err.toFixed(2)+"%）";
+    if(window._lastFit){
+      const dev=Math.abs(window._lastFit.h-h)/h*100;
+      html+="<br>仿真 h="+window._lastFit.h.toExponential(4)+" J·s → <b>仿真/真实偏差 "+dev.toFixed(2)+"%</b>";
+    } else html+="<br>（仿真数据拟合后可在此对比仿真与真实结果）";
+  } else html+="真实数据不足 2 组，无法拟合。";
+  rb.innerHTML=html; rb.style.display="block";
+}
+/* ---------------- 报告打印 / PDF ---------------- */
+els("btnPrint").onclick = ()=>{
+  if(!els("report").textContent.includes("════")){ toast("请先生成报告","warn"); return; }
+  window.print(); toast("在打印对话框中选择「另存为 PDF」","ok");
+};
+
+/* ---------------- AI 助教（三引擎 + 四角色） ---------------- */
+const ROLE_META = {
+  guide:   {name:"探究引导者", sys:"你是光电效应虚拟实验的苏格拉底式探究引导者。绝不直接给出完整答案，而是用1-3个引导性问题+简短提示，帮助学生自己发现规律。回答控制在120字内，语气亲切。"},
+  coach:   {name:"操作纠错员", sys:"你是光电效应虚拟实验的操作纠错员。根据实验状态上下文，指出学生当前操作中的问题（如波长选择、电压方向、无效测量），给出具体可执行的纠正步骤。回答控制在120字内。"},
+  analyst: {name:"数据分析员", sys:"你是光电效应实验的数据分析员。负责评估数据质量、最小二乘拟合结果、误差来源（接触电势差、暗电流、杂散光等）与改进建议。可使用简单的数值与公式。回答控制在150字内。"},
+  examiner:{name:"答辩教练", sys:"你是光电效应实验的答辩教练。针对学生的实际操作记录提出2-3个答辩中可能被问到的问题，并附简短的作答要点提示。回答控制在150字内。"},
+};
+const AI_CFG = {
+  mode:"auto", ollama:"http://localhost:11434", omodel:"qwen2.5:0.5b",
+  apiUrl:"https://api.openai.com/v1/chat/completions", apiKey:"", apiModel:"gpt-4o-mini",
+  engine:null, // local | api | offline
+};
+const STUDENT={name:"",sid:"",cls:""};
+function buildContext(){
+  const fit=window._lastFit? window._lastFit : null;
+  return `【实验实时状态】波长=${S.wl}nm 频率ν=${(PHYS.c/(S.wl*1e-9)/1e14).toFixed(3)}×10¹⁴Hz 光子能量=${S.E.toFixed(2)}eV 金属逸出功W₀=${S.metal}eV 电压U=${S.volt.toFixed(2)}V 光电流I=${S.I.toFixed(2)}μA 遏止电压理论值=${S.E>S.metal?S.Uc.toFixed(3)+"V":"无光电效应"} 已采集数据组数=${S.data.length}${S.data.length?` 数据=[${S.data.map(d=>`(λ${d.wl}nm,Uc${d.Uc.toFixed(3)}V)`).join(" ")}]`:""}${fit&&fit.fit?` 拟合结果:斜率=${fit.fit.slope.toExponential(3)} R²=${fit.fit.r2.toFixed(4)} 求得h=${fit.h.toExponential(4)}J·s 相对误差=${fit.hErr.toFixed(2)}%`:""}\n【最近操作】${S.actions.slice(-6).map(a=>a.a).join(" → ")||"无"}`;
+}
+function sysMsg(t){ chatAdd("sys",t); }
+function chatAdd(role,text,skipSave){
+  const tag={ai:`<span class="tag">🤖 ${ROLE_META[S.role].name}</span>`,user:"",sys:""}[role];
+  const d=document.createElement("div"); d.className="msg "+role;
+  d.innerHTML=tag+text.replace(/</g,"&lt;").replace(/\n/g,"<br>");
+  els("chat").appendChild(d);
+  const body=els("tab-ai"); body.scrollTop=body.scrollHeight;
+  if(role==="ai"&&S.voiceOut) speak(text);
+  while(els("chat").children.length>40) els("chat").firstChild.remove();
+  if(!skipSave){ S.chat.push({role,text}); if(S.chat.length>40) S.chat.shift();
+    try{ localStorage.setItem("pe_chat",JSON.stringify(S.chat)); }catch(e){} }
+}
+function speak(t){
+  try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t.replace(/[📖🤖💡✓]/g,""));
+    u.lang="zh-CN"; u.rate=1.05; speechSynthesis.speak(u);}catch(e){}
+}
+function toast(t,cls){ const d=document.createElement("div"); d.className="toast "+(cls||"");
+  d.textContent=t; els("toasts").appendChild(d); setTimeout(()=>d.remove(),3200); }
+
+/* --- 引擎检测 --- */
+async function detectEngine(){
+  setAIStatus("…","正在检测 AI 引擎…");
+  const tryLocal = AI_CFG.mode==="auto"||AI_CFG.mode==="local";
+  const tryApi   = AI_CFG.mode==="auto"||AI_CFG.mode==="api";
+  if(tryLocal){
+    try{
+      const ctl=new AbortController(); setTimeout(()=>ctl.abort(),2500);
+      const r=await fetch(AI_CFG.ollama+"/api/tags",{signal:ctl.signal});
+      if(r.ok){ const j=await r.json();
+        if(j.models&&j.models.length){
+          AI_CFG.engine="local";
+          const has=j.models.some(m=>m.name.startsWith(AI_CFG.omodel.split(":")[0]));
+          setAIStatus("g",`本地 Ollama 已连接（${has?AI_CFG.omodel:j.models[0].name}）`); return;
+        }
+      }
+    }catch(e){}
+  }
+  if(tryApi && AI_CFG.apiKey){ AI_CFG.engine="api"; setAIStatus("y","在线 API 模式（已配置 Key）"); return; }
+  if(AI_CFG.mode==="local"){ AI_CFG.engine=null; setAIStatus("r","本地 Ollama 不可达，已临时回退内置离线智能"); AI_CFG.engine="offline"; return; }
+  AI_CFG.engine="offline"; setAIStatus("g","内置离线智能（规则引擎，无需联网）");
+}
+function setAIStatus(dot,text){ els("aiDot").className="dot "+dot; els("aiStatusText").textContent=text;
+  const b=els("aiModeBadge");
+  const map={local:["本地 LLM · 离线","ok"],api:["在线 API","warn"],offline:["内置离线智能","ok"]};
+  const m=map[AI_CFG.engine]||["AI 检测中…",""]; b.textContent="🤖 "+m[0]; b.className="badge "+m[1];
+}
+
+/* --- 聊天主入口 --- */
+let busy=false;
+async function askAI(q){
+  if(busy||!q.trim()) return; busy=true;
+  chatAdd("user",q); const msgEl=els("chat").lastChild;
+  const think=document.createElement("div"); think.className="msg ai"; think.textContent="思考中…";
+  els("chat").appendChild(think);
+  let reply=null;
+  try{
+    if(AI_CFG.engine==="local") reply=await callOllama(q);
+    else if(AI_CFG.engine==="api") reply=await callApi(q);
+  }catch(e){ console.warn(e); }
+  if(!reply) reply=offlineBrain(q);
+  think.remove(); chatAdd("ai",reply); busy=false;
+}
+async function callOllama(q){
+  const r=await fetch(AI_CFG.ollama+"/api/chat",{
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model:AI_CFG.omodel, stream:false, options:{num_predict:300},
+      messages:[{role:"system",content:ROLE_META[S.role].sys+"\n"+buildContext()},
+                ...chatHistory(),{role:"user",content:q}]})});
+  if(!r.ok) throw new Error("ollama "+r.status);
+  return (await r.json()).message.content.trim();
+}
+async function callApi(q){
+  const r=await fetch(AI_CFG.apiUrl,{
+    method:"POST", headers:{"Content-Type":"application/json","Authorization":"Bearer "+AI_CFG.apiKey},
+    body:JSON.stringify({model:AI_CFG.apiModel, max_tokens:400,
+      messages:[{role:"system",content:ROLE_META[S.role].sys+"\n"+buildContext()},
+                ...chatHistory(),{role:"user",content:q}]})});
+  if(!r.ok) throw new Error("api "+r.status);
+  return (await r.json()).choices[0].message.content.trim();
+}
+function chatHistory(){
+  return [...els("chat").children].slice(-6).map(m=>({
+    role:m.classList.contains("user")?"user":"assistant",
+    content:m.textContent.replace(/^(🤖 \S+)\n?/,"")}));
+}
+
+/* --- 内置离线智能（规则引擎：始终可用，答辩兜底） --- */
+function offlineBrain(q){
+  const has=re=>re.test(q);
+  const nu=(PHYS.c/(S.wl*1e-9)/1e14).toFixed(2), fit=window._lastFit;
+  let core="";
+  if(has(/遏止|截止电压|Uc|U꜀/)){
+    core=S.E>S.metal
+      ?`当前 λ=${S.wl}nm 时理论遏止电压 U꜀=(hν−W₀)/e=${S.Uc.toFixed(3)}V。测量方法：加反向电压，让电流恰好降为 0。你可以点击「⚡ 自动测 Uꀁ」让我帮你扫描。`
+      :`当前 λ=${S.wl}nm 光子能量 ${S.E.toFixed(2)}eV < W₀=${S.metal}eV，根本不会发生光电效应，因此没有遏止电压可言——想想为什么？`;
+  }
+  else if(has(/普朗克|h 的|求h|求 h|斜率|拟合/)){
+    core=fit? `你的拟合结果：斜率 k=${fit.fit.slope.toExponential(3)}，R²=${fit.fit.r2.toFixed(4)}，求得 h=${fit.h.toExponential(4)} J·s，相对误差 ${fit.hErr.toFixed(2)}%。${Math.abs(fit.hErr)<5?"非常漂亮！":"误差偏大，检查离群点并增加数据组数。"}` 
+      : `思路：U꜀=(h/e)ν−W₀/e 是直线，斜率 k=h/e。请采集 ≥5 组不同波长的 U꜀，在「数据记录」页点「拟合求 h」。目前你已有 ${S.data.length} 组。`;
+  }
+  else if(has(/没电流|无电流|为什么.*不|没有光/)){
+    core = S.inten===0 ? "光强为 0，没有光照射当然没有电流，请调大光强。"
+      : S.E<=S.metal ? `光子能量 ${S.E.toFixed(2)}eV 低于逸出功 ${S.metal}eV：单个电子无论同时吸收几个光子（普通光强下），都无法逸出。这就是截止频率（红限）现象——试着减小波长试试？`
+      : S.volt<=-S.Uc ? `存在光电效应，但反向电压 ${S.volt.toFixed(2)}V 已超过遏止电压 ${S.Uc.toFixed(3)}V，最快电子也被拉回去了。把电压往正向调一点，电流就会出现。`
+      : "当前条件下应有电流（I="+S.I.toFixed(2)+"μA）。若指针不动，请刷新页面重试。";
+  }
+  else if(has(/波长|频率|红限|截止频率/)){
+    core=`λ=${S.wl}nm 对应 ν=${nu}×10¹⁴Hz、E=${S.E.toFixed(2)}eV。金属 W₀=${S.metal}eV，截止波长 λ₀=hc/W₀≈${(1240/S.metal).toFixed(0)}nm——波长比它长就不发电。你的实验就围绕这个边界展开。`;
+  }
+  else if(has(/逸出功|功函数|W0|W₀/)){
+    core=`当前金属 W₀=${S.metal}eV。逸出功是电子离开金属所需的最小能量，不同金属不同：Cs 1.95 < K 2.30 < Na 2.36 < Ca 2.87 < Zn 4.33 eV。换金属会改变截止频率和遏止电压的截距，但不改变直线斜率 h/e——这是本实验设计的关键！`;
+  }
+  else if(has(/误差|准确/)){
+    core=`本实验主要误差来源：① 接触电势差使测得的 U꜀ 偏移；② 阳极光电效应产生的反向电流使拐点变缓；③ 暗电流与本底光。改进：加滤光片、暗环境、多点拟合取 R² 高的线性区间。${fit?`你目前 R²=${fit.fit.r2.toFixed(4)}。`:""}`;
+  }
+  else if(has(/光强|饱和/)){
+    core=`光强只改变饱和光电流大小（单位时间光子数），不改变光电子最大初动能，因此 U꜀ 与光强无关——这是与经典波动理论矛盾的关键证据之一。当前饱和电流约 ${S.Isat.toFixed(1)}μA。`;
+  }
+  else if(has(/你好|hi|hello|你是|帮助|怎么玩|怎么用/)){
+    core=`我是你的 AI 实验助教。你可以：① 问任何关于光电效应的问题；② 让我分析数据；③ 点击「自动测 U꜀」采集数据后请我做拟合评估；④ 让我出答辩考题。当前有 4 个角色模式可选。`;
+  }
+  else if(has(/光电效应|原理|是什么/)){
+    core=`光电效应：光照射金属→电子吸收一个光子→若 hν>W₀ 则以动能 Ek=hν−W₀ 逸出。核心实验证据：存在红限、Ek 只依赖频率、瞬时发射。爱因斯坦因此获 1921 年诺贝尔奖。想动手验证哪个规律？`;
+  }
+  else core=`我在听。关于这个实验，你可以问我：遏止电压怎么测、为什么没电流、普朗克常量怎么求、误差来源等。我也能看到你当前的实验状态（λ=${S.wl}nm, U=${S.volt.toFixed(2)}V, ${S.data.length}组数据）。`;
+
+  const flavor={
+    guide:"\n\n🤔 先别急着记结论——你觉得下一步应该改变哪个量来验证？",
+    coach:"\n\n🛠️ 当前状态诊断："+(S.E<=S.metal&&S.inten>0?"⚠️ 波长偏长，无光电效应，建议减小波长。":S.volt<0?`反向电压中，U꜀理论值 ${S.Uc.toFixed(3)}V。`:"条件正常，继续采集数据。"),
+    analyst:"\n\n📈 数据侧提示："+(S.data.length>=5?"样本量充足，可以拟合了。":"样本量 "+S.data.length+"/5，建议继续采集不同波长。"),
+    examiner:"\n\n🎓 模拟考题：为什么 U꜀–ν 图的斜率与金属种类无关？如果老师追问，你打算怎么答？",
+  }[S.role];
+  return core+flavor;
+}
+
+/* --- 界面事件 --- */
+els("aiRoles").onclick = e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  els("aiRoles").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); S.role=b.dataset.role;
+  sysMsg(`已切换到「${ROLE_META[S.role].name}」模式`);
+  chatAdd("ai", ROLE_INTRO[S.role]);
+};
+const ROLE_INTRO={
+  guide:"你好！我不会直接告诉你答案——我会用问题引导你自己发现光电效应的规律。先试试把波长调到最大，观察微安表有什么变化？",
+  coach:"操作纠错员已上线。我会实时监控你的实验状态，发现操作问题会立刻提醒你。也可以随时问我「现在我的操作有什么问题」。",
+  analyst:"数据分析员就绪。采集数据后告诉我，我会评估拟合质量、分析误差来源。建议采集 ≥5 组不同波长的 U꜀。",
+  examiner:"答辩教练在此！我会根据你的实际操作记录出考题。做完一轮实验后来找我，测试你是否真的理解了。",
+};
+els("btnSend").onclick = ()=>{ const t=els("aiText").value; els("aiText").value=""; askAI(t); };
+els("aiText").onkeydown = e=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault(); els("btnSend").click();} };
+els("voiceOut").onchange = e=> S.voiceOut=e.target.checked;
+
+/* 语音输入 */
+const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null;
+els("btnMic").onclick = ()=>{
+  if(!SR){ toast("当前浏览器不支持语音识别（建议 Chrome/Edge）","warn"); return; }
+  if(rec){ rec.stop(); return; }
+  rec=new SR(); rec.lang="zh-CN"; rec.interimResults=false;
+  els("btnMic").classList.add("rec");
+  rec.onresult=e=>{ const t=e.results[0][0].transcript; els("aiText").value=t; els("btnSend").click(); };
+  rec.onend=()=>{ els("btnMic").classList.remove("rec"); rec=null; };
+  rec.onerror=()=>{ toast("语音识别失败","warn"); els("btnMic").classList.remove("rec"); rec=null; };
+  rec.start(); toast("🎤 正在聆听…");
+};
+
+/* ---------------- AI 主动纠错（COACH 模块） ---------------- */
+function coachCheck(){
+  if(S.inten>0 && S.E<=S.metal && !S.hints.redlimit){
+    S.hints.redlimit=true;
+    showAiHint(`<b>🛠️ 纠错提示</b>：λ=${S.wl}nm 的光子能量 ${S.E.toFixed(2)}eV 低于 ${S.metal===4.33?"锌":"当前金属"}的逸出功 ${S.metal}eV，无论光强多大都不会有电流。想想：截止波长是多少？`);
+    setTimeout(hideAiHint,10000);
+  }
+  if(S.E>S.metal && S.volt<=-S.Uc-0.3 && S.inten>0 && !S.hints.volt){
+    S.hints.volt=true;
+    showAiHint(`<b>🛠️ 纠错提示</b>：你加了 ${S.volt.toFixed(2)}V 反向电压，已经低于遏止电压 ${S.Uc.toFixed(3)}V——所有电子都被拉回去了。这个状态正是「测 U꜀」需要的临界情况，体会一下。`);
+    setTimeout(hideAiHint,10000);
+  }
+}
+function showAiHint(html){ const h=els("aiHint"); h.innerHTML=html; h.classList.add("on"); }
+function hideAiHint(){ els("aiHint").classList.remove("on"); }
+setInterval(()=>{
+  if(!S.hints.redlimit && S.inten>0 && S.E<=S.metal) coachCheck();
+},4000);
+
+/* ---------------- 报告生成 ---------------- */
+els("btnGenReport").onclick = ()=>{
+  const fit=window._lastFit;
+  const sig=(STUDENT.name||STUDENT.sid||STUDENT.cls)
+    ? `\n姓名：${STUDENT.name||"—"}    学号：${STUDENT.sid||"—"}    班级：${STUDENT.cls||"—"}\n` : "";
+  const repTxt =
+`════ 实验报告 · 光电效应 ════
+生成时间：${new Date().toLocaleString("zh-CN")}${sig}
+
+一、实验条件
+  金属材料：W₀ = ${S.metal} eV
+  波长范围：${S.data.length? Math.min(...S.data.map(d=>d.wl))+" ~ "+Math.max(...S.data.map(d=>d.wl))+" nm":"未采集"}
+  数据组数：${S.data.length}${S.real.length?`（另有导入的真实对照数据 ${S.real.length} 组）`:""}
+
+二、数据记录
+${S.data.map((d,i)=>`  ${i+1}. λ=${d.wl}nm  ν=${d.nu.toFixed(3)}×10¹⁴Hz  U꜀=${d.Uc.toFixed(3)}V`).join("\n")||"  （无数据）"}
+
+三、拟合结果
+${fit? `  U꜀ = ${fit.fit.slope.toExponential(4)}·ν + ${fit.fit.icept.toFixed(3)}  (R²=${fit.fit.r2.toFixed(4)})
+  普朗克常量 h = ${fit.h.toExponential(4)} J·s
+  公认值       = 6.6261e-34 J·s
+  相对误差     = ${fit.hErr.toFixed(2)} %`:"  （未拟合）"}
+
+四、操作轨迹（AI 纠错依据）
+${S.actions.slice(-10).map(a=>"  · "+a.a).join("\n")||"  （无）"}
+
+五、结论
+  ${fit? (Math.abs(fit.hErr)<5? "实验验证了爱因斯坦光电方程 Ek=hν−W₀，测得的普朗克常量与公认值符合良好。":"测得的 h 存在偏差，主要误差来源为接触电势差与阳极反向电流。"):"  请先完成数据采集与拟合。"}
+
+—— 本报告由虚拟仿真实验系统自动生成`;
+  els("report").innerHTML = repTxt.replace(/</g,"&lt;")
+    + `<img src="${els("chart").toDataURL("image/png")}" style="width:92%;display:block;margin:10px auto 0" alt="U꜀–ν 图线">`;
+  toast("报告已生成（含图线）","ok");
+};
+els("btnAiReview").onclick = ()=>{
+  const rep=els("report").textContent;
+  if(rep.includes("════")){ switchTab("ai"); askAI("请以实验教师视角评估以下我的实验报告，指出亮点与不足，并给出 1 个改进建议：\n\n"+rep.slice(0,1200)); }
+  else { toast("请先生成报告","warn"); }
+};
+
+/* ---------------- 标签页切换 ---------------- */
+function switchTab(name){
+  document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===name));
+  document.querySelectorAll(".tab-body").forEach(b=>b.classList.toggle("on",b.id==="tab-"+name));
+}
+document.querySelector(".tabs").onclick=e=>{
+  const b=e.target.closest("button"); if(b) switchTab(b.dataset.tab);
+};
+
+/* ---------------- VR 观察（WebXR，原生 WebGL 实现，零依赖） ---------------- */
+els("btnVR").onclick = async ()=>{
+  if(!("xr" in navigator)){ toast("此浏览器不支持 WebXR","warn"); return; }
+  try{
+    const ok=await navigator.xr.isSessionSupported("immersive-vr");
+    if(!ok){ toast("未检测到 VR 头显。功能已就绪，连接头显或打开 VR 模拟器即可体验","warn"); return; }
+    const xrCanvas=document.createElement("canvas");
+    const gl=xrCanvas.getContext("webgl",{xrCompatible:true});
+    const vs="attribute vec2 p;uniform mat4 uP,uMV;varying vec2 vU;void main(){vU=p*0.5+0.5;gl_Position=uP*uMV*vec4(p,0.0,1.0);}";
+    const fs="precision mediump float;varying vec2 vU;uniform sampler2D uT;void main(){vec3 c=texture2D(uT,vU).rgb;float d=distance(vU,vec2(0.5));gl_FragColor=vec4(c*smoothstep(0.72,0.62,d),1.0);}";
+    function sh(t,s){ const o=gl.createShader(t); gl.shaderSource(o,s); gl.compileShader(o); return o; }
+    const pr=gl.createProgram();
+    gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs)); gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));
+    gl.linkProgram(pr); gl.useProgram(pr);
+    const buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+    const w=4.2, h=w*540/960, z=-3;   // 巨幕：4.2m × 2.4m，位于眼前 3m
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-w/2,-h/2, w/2,-h/2, -w/2,h/2, w/2,h/2]),gl.STATIC_DRAW);
+    const loc=gl.getAttribLocation(pr,"p");
+    gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+    const tex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,tex);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.uniform1i(gl.getUniformLocation(pr,"uT"),0);
+    const uP=gl.getUniformLocation(pr,"uP"), uMV=gl.getUniformLocation(pr,"uMV");
+    const session=await navigator.xr.requestSession("immersive-vr");
+    await gl.makeXRCompatible();
+    session.updateRenderState({baseLayer:new XRWebGLLayer(session,gl)});
+    const ref=await session.requestReferenceSpace("local");
+    toast("🥽 VR 会话已启动","ok"); logAction("进入 VR 观察");
+    session.requestAnimationFrame(function frame(t,fObj){
+      const pose=fObj.getViewerPose(ref);
+      if(pose){
+        gl.bindFramebuffer(gl.FRAMEBUFFER,session.renderState.baseLayer.framebuffer);
+        gl.clearColor(0.03,0.04,0.08,1); gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,tex);
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,cv);
+        for(const view of pose.views){
+          const vp=session.renderState.baseLayer.getViewport(view);
+          gl.viewport(vp.x,vp.y,vp.width,vp.height);
+          gl.uniformMatrix4fv(uP,false,view.projectionMatrix);
+          gl.uniformMatrix4fv(uMV,false,view.transform.inverse.matrix);
+          gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+        }
+      }
+      if(!session.ended) session.requestAnimationFrame(frame);
+    });
+    session.addEventListener("end",()=>toast("VR 会话结束","ok"));
+  }catch(err){ console.warn(err); toast("VR 启动失败："+err.message,"warn"); }
+};
+
+/* ---------------- 设置面板 ---------------- */
+els("btnSettings").onclick = ()=>{
+  els("cfgOllama").value=AI_CFG.ollama; els("cfgOModel").value=AI_CFG.omodel;
+  els("cfgApiUrl").value=AI_CFG.apiUrl; els("cfgApiKey").value=AI_CFG.apiKey; els("cfgApiModel").value=AI_CFG.apiModel;
+  els("stName").value=STUDENT.name; els("stSid").value=STUDENT.sid; els("stClass").value=STUDENT.cls;
+  els("modeRow").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.mode===AI_CFG.mode));
+  els("mSettings").classList.add("on");
+};
+els("modeRow").onclick=e=>{ const b=e.target.closest("button"); if(!b) return;
+  els("modeRow").querySelectorAll("button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); };
+els("cfgCancel").onclick=()=>els("mSettings").classList.remove("on");
+els("cfgSave").onclick=()=>{
+  AI_CFG.mode=els("modeRow").querySelector(".on").dataset.mode;
+  AI_CFG.ollama=els("cfgOllama").value.trim(); AI_CFG.omodel=els("cfgOModel").value.trim();
+  AI_CFG.apiUrl=els("cfgApiUrl").value.trim(); AI_CFG.apiKey=els("cfgApiKey").value.trim(); AI_CFG.apiModel=els("cfgApiModel").value.trim();
+  STUDENT.name=els("stName").value.trim(); STUDENT.sid=els("stSid").value.trim(); STUDENT.cls=els("stClass").value.trim();
+  try{ localStorage.setItem("pe_cfg",JSON.stringify(AI_CFG));
+       localStorage.setItem("pe_student",JSON.stringify(STUDENT)); }catch(e){}
+  els("mSettings").classList.remove("on"); toast("设置已保存，正在检测引擎…","ok"); detectEngine();
+};
+try{ const st=JSON.parse(localStorage.getItem("pe_student")||"null"); if(st) Object.assign(STUDENT,st); }catch(e){}
+try{ const saved=localStorage.getItem("pe_cfg"); if(saved) Object.assign(AI_CFG,JSON.parse(saved)); }catch(e){}
+
+/* ---------------- 启动 ---------------- */
+try{
+  const d=JSON.parse(localStorage.getItem("pe_data")||"null");
+  if(Array.isArray(d)) S.data=d;
+  const r=JSON.parse(localStorage.getItem("pe_real")||"null");
+  if(Array.isArray(r)) S.real=r;
+}catch(e){}
+renderData(); drawChart(autoFit()); computePhysics(); loop();
+if(S.real.length){ els("btnClearReal").disabled=false; updateRealBox(); }
+/* 恢复聊天记录（无记录则显示欢迎语） */
+try{
+  const ch=JSON.parse(localStorage.getItem("pe_chat")||"null");
+  if(Array.isArray(ch)&&ch.length){ S.chat=ch; ch.forEach(m=>chatAdd(m.role,m.text,true));
+    sysMsg("已恢复上次对话记录（"+ch.length+" 条）。"); }
+  else chatAdd("ai", ROLE_INTRO.guide);
+}catch(e){ chatAdd("ai", ROLE_INTRO.guide); }
+/* 首次使用引导 */
+let seen=true;
+try{ seen=!!localStorage.getItem("pe_seen"); }catch(e){}
+els("btnGuideGo").onclick=()=>{ els("mGuide").classList.remove("on");
+  try{ localStorage.setItem("pe_seen","1"); }catch(e){}
+  toast("开始探索吧！有疑问随时问 AI 助教","ok"); };
+if(!seen) els("mGuide").classList.add("on");
+detectEngine();
+setTimeout(()=>sysMsg("💡 提示：点击右上角「⚙️ 设置」可连接本地 Ollama 大模型，实现完全离线的 AI 助教（加分项）。"),1500);
+</script>
+</body>
+</html>
